@@ -50,3 +50,9 @@ build/
 
 # Swift 
 Package.resolved
+
+# Gradle/Android
+.gradle/
+.cxx/
+local.properties
+.idea/

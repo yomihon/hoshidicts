@@ -157,7 +157,10 @@ bool yomitan_parser::parse_pitch(std::string_view content, ParsedPitch& out) {
   }
 
   out.reading = parsed.reading;
-  out.pitches =
-      parsed.pitches | std::views::transform(&internal::PitchesArray::position) | std::ranges::to<std::vector>();
+  out.pitches.clear();
+  out.pitches.reserve(parsed.pitches.size());
+  for (const auto& pitch : parsed.pitches) {
+    out.pitches.push_back(pitch.position);
+  }
   return true;
 }

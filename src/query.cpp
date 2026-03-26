@@ -274,7 +274,11 @@ std::vector<TermResult> DictionaryQuery::query(const std::string& expression) co
     }
   }
 
-  auto results = term_map | std::views::values | std::views::as_rvalue | std::ranges::to<std::vector>();
+  std::vector<TermResult> results;
+  results.reserve(term_map.size());
+  for (auto& [key, value] : term_map) {
+    results.push_back(std::move(value));
+  }
   query_freq(results);
   query_pitch(results);
 
@@ -443,11 +447,21 @@ std::vector<char> DictionaryQuery::get_media_file(const std::string& dict_name, 
 }
 
 std::vector<DictionaryStyle> DictionaryQuery::get_styles() const {
-  return term_dicts_ | std::views::filter([](const auto& d) { return !d.styles.empty(); }) |
-         std::views::transform([](const auto& d) { return DictionaryStyle{d.name, d.styles}; }) |
-         std::ranges::to<std::vector>();
+  std::vector<DictionaryStyle> styles;
+  styles.reserve(term_dicts_.size());
+  for (const auto& dict : term_dicts_) {
+    if (!dict.styles.empty()) {
+      styles.push_back(DictionaryStyle{dict.name, dict.styles});
+    }
+  }
+  return styles;
 }
 
 std::vector<std::string> DictionaryQuery::get_freq_dict_order() const {
-  return freq_dicts_ | std::views::transform([](const auto& d) { return d.name; }) | std::ranges::to<std::vector>();
+  std::vector<std::string> order;
+  order.reserve(freq_dicts_.size());
+  for (const auto& dict : freq_dicts_) {
+    order.push_back(dict.name);
+  }
+  return order;
 }

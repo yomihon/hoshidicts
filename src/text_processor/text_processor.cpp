@@ -23,20 +23,22 @@ constexpr std::u32string_view HIRAGANA_U_ROW = U"ぅうくぐすずっつづぬ�
 constexpr std::u32string_view HIRAGANA_E_ROW = U"ぇえけげせぜてでねへべぺめれゑゖ";
 constexpr std::u32string_view HIRAGANA_O_ROW = U"ぉおこごそぞとどのほぼぽもょよろを";
 
+bool contains_char(std::u32string_view text, char32_t value) { return text.find(value) != std::u32string_view::npos; }
+
 char32_t get_prolonged_hiragana(char32_t c) {
-  if (HIRAGANA_A_ROW.contains(c)) {
+  if (contains_char(HIRAGANA_A_ROW, c)) {
     return U'あ';
   }
-  if (HIRAGANA_I_ROW.contains(c)) {
+  if (contains_char(HIRAGANA_I_ROW, c)) {
     return U'い';
   }
-  if (HIRAGANA_U_ROW.contains(c)) {
+  if (contains_char(HIRAGANA_U_ROW, c)) {
     return U'う';
   }
-  if (HIRAGANA_E_ROW.contains(c)) {
+  if (contains_char(HIRAGANA_E_ROW, c)) {
     return U'え';
   }
-  if (HIRAGANA_O_ROW.contains(c)) {
+  if (contains_char(HIRAGANA_O_ROW, c)) {
     return U'う';
   }
   return 0;

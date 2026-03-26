@@ -107,7 +107,11 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
     }
   }
 
-  auto results = result_map | std::views::values | std::views::as_rvalue | std::ranges::to<std::vector>();
+  std::vector<LookupResult> results;
+  results.reserve(result_map.size());
+  for (auto& [key, value] : result_map) {
+    results.push_back(std::move(value));
+  }
   const auto freq_dict_order = query_.get_freq_dict_order();
   auto middle_iter = std::ranges::next(results.begin(), max_results, results.end());
   std::ranges::partial_sort(results, middle_iter, [&freq_dict_order](const auto& a, const auto& b) {
