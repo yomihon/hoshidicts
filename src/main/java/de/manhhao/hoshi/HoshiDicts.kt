@@ -21,6 +21,8 @@ class HoshiDicts {
     external fun importDictionary(zipPath: String, outputDir: String): ImportResult
     
     external fun lookup(session: Long, text: String, maxResults: Int): Array<LookupResult>
+
+    external fun queryExact(session: Long, expression: String): Array<TermResult>
     
     external fun getStyles(session: Long): Array<DictionaryStyle>
     

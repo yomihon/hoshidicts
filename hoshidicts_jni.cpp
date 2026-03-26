@@ -276,6 +276,22 @@ Java_de_manhhao_hoshi_HoshiDicts_lookup(JNIEnv *env, jobject, jlong session, jst
 }
 
 extern "C" JNIEXPORT jobjectArray JNICALL
+Java_de_manhhao_hoshi_HoshiDicts_queryExact(JNIEnv *env, jobject, jlong session, jstring expression) {
+    LookupObject *obj = as_object(session);
+    auto expression_str = jstring_to_std_string(env, expression);
+    auto result = obj->query.query(expression_str);
+
+    jclass cls = env->FindClass("de/manhhao/hoshi/TermResult");
+    jobjectArray array = env->NewObjectArray(static_cast<jsize>(result.size()), cls, nullptr);
+    for (size_t i = 0; i < result.size(); ++i) {
+        jobject item = new_term_result(env, result[i]);
+        env->SetObjectArrayElement(array, static_cast<jsize>(i), item);
+        env->DeleteLocalRef(item);
+    }
+    return array;
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
 Java_de_manhhao_hoshi_HoshiDicts_getStyles(JNIEnv *env, jobject, jlong session) {
     LookupObject *obj = as_object(session);
     auto styles = obj->query.get_styles();
