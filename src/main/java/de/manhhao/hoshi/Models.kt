@@ -4,7 +4,8 @@ data class ImportResult(
     val success: Boolean,
     val termCount: Long,
     val metaCount: Long,
-    val mediaCount: Long
+    val mediaCount: Long,
+    val storagePath: String
 )
 
 data class GlossaryEntry(

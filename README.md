@@ -10,6 +10,8 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
 ```
 Imports a Yomitan `.zip` dictionary file into a custom format. The resulting folder is stored in `output_dir/<dict_title>`. Glossaries are compressed using zstd. Term, frequency and pitch dictionaries are generally supported, but only a small part of the pitch accent spec was implemented. Setting `low_ram` to `true` can reduce memory usage significantly at the cost of slightly lower import speed.
 
+`ImportResult` exposes a deterministic `storage_path` on successful imports. The `success` flag reflects the final materialized output state, and reconciles to `true` when a valid output marker already exists.
+
 ### query
 ```cpp
 void DictionaryQuery::add_term_dict(const std::string& path)

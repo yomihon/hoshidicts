@@ -39,11 +39,14 @@ namespace {
     }
 
     jobject new_import_result(JNIEnv *env, bool success, jlong term_count, jlong meta_count,
-                              jlong media_count) {
+                              jlong media_count, const std::string &storage_path) {
         jclass cls = env->FindClass("de/manhhao/hoshi/ImportResult");
-        jmethodID ctor = env->GetMethodID(cls, "<init>", "(ZJJJ)V");
-        return env->NewObject(cls, ctor, static_cast<jboolean>(success), term_count, meta_count,
-                              media_count);
+        jmethodID ctor = env->GetMethodID(cls, "<init>", "(ZJJJLjava/lang/String;)V");
+        jstring j_storage_path = new_string(env, storage_path);
+        jobject result = env->NewObject(cls, ctor, static_cast<jboolean>(success), term_count, meta_count,
+                                        media_count, j_storage_path);
+        env->DeleteLocalRef(j_storage_path);
+        return result;
     }
 
     jobjectArray
@@ -263,7 +266,7 @@ Java_de_manhhao_hoshi_HoshiDicts_importDictionary(JNIEnv *env, jobject, jstring 
     const auto result = dictionary_importer::import(zip_path_str, output_dir_str, true);
     return new_import_result(env, result.success, static_cast<jlong>(result.term_count),
                              static_cast<jlong>(result.meta_count),
-                             static_cast<jlong>(result.media_count));
+                             static_cast<jlong>(result.media_count), result.storage_path);
 }
 
 extern "C" JNIEXPORT jobjectArray JNICALL

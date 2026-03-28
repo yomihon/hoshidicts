@@ -6,6 +6,7 @@
 struct ImportResult {
   bool success = false;
   std::string title;
+  std::string storage_path;
   size_t term_count = 0;
   size_t meta_count = 0;
   size_t media_count = 0;

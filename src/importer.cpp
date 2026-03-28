@@ -487,6 +487,13 @@ size_t write_media(const std::string& path, zip_t* archive, const std::vector<in
   media_idx.write(index_buf.data(), static_cast<std::streamsize>(index_buf.size()));
   return media_count;
 }
+
+bool has_materialized_output(const std::filesystem::path& path) {
+  return std::filesystem::is_regular_file(path / ".hoshidicts_1") ||
+         (std::filesystem::is_regular_file(path / "index.json") &&
+          std::filesystem::is_regular_file(path / "blobs.bin") &&
+          std::filesystem::is_regular_file(path / "hash.table"));
+}
 }
 
 ImportResult dictionary_importer::import(const std::string& zip_path, const std::string& output_dir, bool low_ram) {
@@ -508,9 +515,14 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
       throw std::runtime_error("failed to parse index.json");
     }
 
-    result.title = index.title;
+    if (index.title.empty()) {
+      throw std::runtime_error("dictionary title is empty");
+    }
 
-    std::filesystem::path dict_path = std::filesystem::path(output_dir) / result.title;
+    result.title = index.title;
+    result.storage_path = (std::filesystem::path(output_dir) / result.title).lexically_normal().string();
+
+    std::filesystem::path dict_path = result.storage_path;
     std::string path = dict_path.string();
     std::filesystem::create_directories(dict_path);
 
@@ -562,8 +574,16 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     zip_close(archive);
   }
 
-  if (!result.success && !result.title.empty()) {
-    std::filesystem::remove_all(std::filesystem::path(output_dir) / result.title);
+  if (!result.storage_path.empty()) {
+    const std::filesystem::path storage_path(result.storage_path);
+    if (!result.success && has_materialized_output(storage_path)) {
+      result.success = true;
+      result.errors.clear();
+    }
+
+    if (!result.success) {
+      std::filesystem::remove_all(storage_path);
+    }
   }
 
   return result;
