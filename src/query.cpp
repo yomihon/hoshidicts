@@ -11,6 +11,8 @@
 #endif
 #include <zstd.h>
 
+#include <algorithm>
+#include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -110,6 +112,46 @@ std::string_view read_str(const uint8_t*& addr, uint32_t len) {
   std::string_view result(reinterpret_cast<const char*>(addr), len);
   addr += len;
   return result;
+}
+
+int query_match_priority(const TermResult& term, const std::string& expression) {
+  if (term.expression == expression) {
+    return 0;
+  }
+  if (term.reading == expression) {
+    return 1;
+  }
+  return 2;
+}
+
+int get_freq_value_for_dict(const TermResult& term, const std::string& dict_name) {
+  for (const auto& frequency_entry : term.frequencies) {
+    if (frequency_entry.dict_name != dict_name) {
+      continue;
+    }
+
+    int min_frequency = INT_MAX;
+    for (const auto& frequency : frequency_entry.frequencies) {
+      if (frequency.value >= 0) {
+        min_frequency = std::min(min_frequency, frequency.value);
+      }
+    }
+    return min_frequency;
+  }
+
+  return INT_MAX;
+}
+
+bool freq_sort_order(const TermResult& a, const TermResult& b, const std::vector<std::string>& freq_dict_order) {
+  for (const auto& dict_name : freq_dict_order) {
+    const int freq_a = get_freq_value_for_dict(a, dict_name);
+    const int freq_b = get_freq_value_for_dict(b, dict_name);
+    if (freq_a != freq_b) {
+      return freq_a < freq_b;
+    }
+  }
+
+  return false;
 }
 }
 
@@ -261,7 +303,8 @@ std::vector<TermResult> DictionaryQuery::query(const std::string& expression) co
                       .reading = std::string(reading),
                       .rules = std::string(rules),
                       .glossaries = {},
-                      .frequencies = {}};
+                      .frequencies = {},
+                      .pitches = {}};
       } else {
         if (!rules.empty()) {
           if (!it->second.rules.empty()) {
@@ -281,6 +324,27 @@ std::vector<TermResult> DictionaryQuery::query(const std::string& expression) co
   }
   query_freq(results);
   query_pitch(results);
+
+  const auto freq_dict_order = get_freq_dict_order();
+  std::ranges::stable_sort(results, [&expression, &freq_dict_order](const TermResult& a, const TermResult& b) {
+    const int match_a = query_match_priority(a, expression);
+    const int match_b = query_match_priority(b, expression);
+    if (match_a != match_b) {
+      return match_a < match_b;
+    }
+
+    if (freq_sort_order(a, b, freq_dict_order)) {
+      return true;
+    }
+    if (freq_sort_order(b, a, freq_dict_order)) {
+      return false;
+    }
+
+    if (a.expression != b.expression) {
+      return a.expression < b.expression;
+    }
+    return a.reading < b.reading;
+  });
 
   return results;
 }
