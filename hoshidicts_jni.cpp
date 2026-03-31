@@ -301,6 +301,24 @@ Java_de_manhhao_hoshi_HoshiDicts_getStyles(JNIEnv *env, jobject, jlong session) 
     return new_dictionary_style_array(env, styles);
 }
 
+extern "C" JNIEXPORT jboolean JNICALL
+Java_de_manhhao_hoshi_HoshiDicts_hasMetaModeEntries(JNIEnv *env, jobject, jstring storage_path,
+                                                     jstring mode, jint min_count) {
+    if (storage_path == nullptr || mode == nullptr) {
+        return JNI_FALSE;
+    }
+
+    if (min_count <= 0) {
+        return JNI_TRUE;
+    }
+
+    auto storage_path_str = jstring_to_std_string(env, storage_path);
+    auto mode_str = jstring_to_std_string(env, mode);
+    const bool has_entries = DictionaryQuery::has_meta_mode_entries(
+            storage_path_str, mode_str, static_cast<uint32_t>(min_count));
+    return static_cast<jboolean>(has_entries);
+}
+
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_de_manhhao_hoshi_HoshiDicts_getMediaFile(JNIEnv *env, jobject, jlong session,
                                               jstring dict_name, jstring media_path) {

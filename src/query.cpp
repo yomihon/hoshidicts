@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <ranges>
@@ -153,6 +154,118 @@ bool freq_sort_order(const TermResult& a, const TermResult& b, const std::vector
 
   return false;
 }
+
+constexpr size_t kHashTableHeaderSize = sizeof(uint32_t);
+constexpr size_t kHashTableSlotSize = sizeof(uint64_t) * 2;
+constexpr size_t kOffsetIndexHeaderSize = sizeof(uint32_t);
+constexpr size_t kOffsetIndexEntrySize = sizeof(uint64_t);
+constexpr uint8_t kMetaEntryType = 1;
+
+bool has_space(const uint8_t* current, const uint8_t* end, size_t required_size) {
+  return current <= end && static_cast<size_t>(end - current) >= required_size;
+}
+
+bool meta_blob_matches_mode(const uint8_t* blob_addr, const uint8_t* blobs_end, std::string_view mode) {
+  const uint8_t* cursor = blob_addr;
+  if (!has_space(cursor, blobs_end, sizeof(uint8_t))) {
+    return false;
+  }
+
+  const uint8_t type = read_u8(cursor);
+  if (type != kMetaEntryType) {
+    return false;
+  }
+
+  if (!has_space(cursor, blobs_end, sizeof(uint16_t))) {
+    return false;
+  }
+  const uint16_t expression_len = read_u16(cursor);
+  if (!has_space(cursor, blobs_end, expression_len)) {
+    return false;
+  }
+  cursor += expression_len;
+
+  if (!has_space(cursor, blobs_end, sizeof(uint8_t))) {
+    return false;
+  }
+  const uint8_t mode_len = read_u8(cursor);
+  if (!has_space(cursor, blobs_end, mode_len)) {
+    return false;
+  }
+
+  if (mode_len != mode.size()) {
+    return false;
+  }
+
+  return std::memcmp(cursor, mode.data(), mode_len) == 0;
+}
+
+bool has_meta_mode_entries_in_storage(const uint8_t* hash_table, size_t hash_table_size, const uint8_t* blobs,
+                                      size_t blobs_size, std::string_view mode, uint32_t min_count) {
+  if (!hash_table || !blobs || mode.empty()) {
+    return false;
+  }
+
+  const uint8_t* hash_cursor = hash_table;
+  const uint8_t* hash_end = hash_table + hash_table_size;
+  if (!has_space(hash_cursor, hash_end, kHashTableHeaderSize)) {
+    return false;
+  }
+
+  const uint32_t capacity = read_u32(hash_cursor);
+  const size_t required_hash_table_size =
+      kHashTableHeaderSize + static_cast<size_t>(capacity) * kHashTableSlotSize;
+  if (capacity == 0 || required_hash_table_size > hash_table_size) {
+    return false;
+  }
+
+  const uint8_t* blobs_begin = blobs;
+  const uint8_t* blobs_end = blobs + blobs_size;
+
+  uint32_t matched_entries = 0;
+  for (uint32_t i = 0; i < capacity; ++i) {
+    if (!has_space(hash_cursor, hash_end, kHashTableSlotSize)) {
+      return false;
+    }
+
+    const uint8_t* slot_cursor = hash_cursor;
+    const uint64_t hash = read_u64(slot_cursor);
+    const uint64_t offset_index_offset = read_u64(slot_cursor);
+    hash_cursor += kHashTableSlotSize;
+
+    if (hash == 0 || offset_index_offset == 0 || offset_index_offset >= blobs_size) {
+      continue;
+    }
+
+    const uint8_t* index_cursor = blobs_begin + offset_index_offset;
+    if (!has_space(index_cursor, blobs_end, kOffsetIndexHeaderSize)) {
+      continue;
+    }
+    const uint32_t entry_count = read_u32(index_cursor);
+    if (!has_space(index_cursor, blobs_end, static_cast<size_t>(entry_count) * kOffsetIndexEntrySize)) {
+      continue;
+    }
+
+    for (uint32_t entry = 0; entry < entry_count; ++entry) {
+      const uint64_t blob_offset = read_u64(index_cursor);
+      if (blob_offset >= blobs_size) {
+        continue;
+      }
+
+      const uint8_t* blob_addr = blobs_begin + blob_offset;
+      if (!meta_blob_matches_mode(blob_addr, blobs_end, mode)) {
+        continue;
+      }
+
+      matched_entries++;
+      if (matched_entries >= min_count) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
 }
 
 struct DictionaryQuery::DictionaryData {
@@ -179,6 +292,36 @@ DictionaryQuery::~DictionaryQuery() = default;
 
 DictionaryQuery::DictionaryQuery(DictionaryQuery&&) noexcept = default;
 DictionaryQuery& DictionaryQuery::operator=(DictionaryQuery&&) noexcept = default;
+
+bool DictionaryQuery::has_meta_mode_entries(const std::string& path, const std::string& mode, uint32_t min_count) {
+  if (min_count == 0) {
+    return true;
+  }
+
+  if (mode.empty()) {
+    return false;
+  }
+
+  if (!std::filesystem::is_regular_file(path + "/.hoshidicts_1")) {
+    return false;
+  }
+
+  auto [hash_table, hash_table_size] = map_file(path + "/hash.table");
+  auto [blobs, blobs_size] = map_file(path + "/blobs.bin");
+  if (!hash_table || !blobs) {
+    unmap_file(hash_table, hash_table_size);
+    unmap_file(blobs, blobs_size);
+    return false;
+  }
+
+  const bool has_entries = has_meta_mode_entries_in_storage(
+      reinterpret_cast<const uint8_t*>(hash_table), hash_table_size, reinterpret_cast<const uint8_t*>(blobs),
+      blobs_size, mode, min_count);
+
+  unmap_file(hash_table, hash_table_size);
+  unmap_file(blobs, blobs_size);
+  return has_entries;
+}
 
 void DictionaryQuery::add_dict(const std::string& path, DictionaryType type) {
   if (!std::filesystem::is_regular_file(path + "/.hoshidicts_1")) {

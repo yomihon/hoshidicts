@@ -31,6 +31,11 @@ void DictionaryQuery::add_pitch_dict(const std::string& path)
 Adds an imported pitch dictionary to the query.
 
 ```cpp
+bool DictionaryQuery::has_meta_mode_entries(const std::string& path, const std::string& mode, uint32_t min_count = 1)
+```
+Returns `true` when the imported dictionary at `path` contains at least `min_count` meta entries for a given `mode` (for example `"freq"` or `"pitch"`).
+
+```cpp
 std::vector<TermResult> DictionaryQuery::query(const std::string& expression) const
 ```
 Queries all added dictionaries for the given expression. TermResult includes glossary, frequency and pitch data in the order dictionaries were added. Glossaries are decompressed.

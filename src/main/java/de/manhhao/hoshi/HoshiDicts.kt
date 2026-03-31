@@ -27,4 +27,13 @@ class HoshiDicts {
     external fun getStyles(session: Long): Array<DictionaryStyle>
     
     external fun getMediaFile(session: Long, dictName: String, mediaPath: String): ByteArray?
+
+    external fun hasMetaModeEntries(storagePath: String, mode: String, minCount: Int): Boolean
+
+    fun isFrequencyDictionary(storagePath: String, minFreqEntryCount: Int = 5): Boolean {
+        if (minFreqEntryCount <= 0) {
+            return true
+        }
+        return hasMetaModeEntries(storagePath, "freq", minFreqEntryCount)
+    }
 }

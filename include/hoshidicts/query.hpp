@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -59,6 +60,8 @@ class DictionaryQuery {
   void query_pitch(std::vector<TermResult>& terms) const;
 
   std::vector<TermResult> query(const std::string& expression) const;
+
+  static bool has_meta_mode_entries(const std::string& path, const std::string& mode, uint32_t min_count = 1);
 
   std::vector<char> get_media_file(const std::string& dict_name, const std::string& media_path) const;
   std::vector<DictionaryStyle> get_styles() const;
