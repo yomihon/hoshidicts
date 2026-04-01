@@ -177,7 +177,7 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
   }
   const auto freq_dict_order = query_.get_freq_dict_order();
   auto middle_iter = std::ranges::next(results.begin(), max_results, results.end());
-  std::ranges::partial_sort(results, middle_iter, [&freq_dict_order](const auto& a, const auto& b) {
+  std::ranges::partial_sort(results, middle_iter, [&freq_dict_order, &lookup_string](const auto& a, const auto& b) {
     auto len_a = utf8::distance(a.matched.begin(), a.matched.end());
     auto len_b = utf8::distance(b.matched.begin(), b.matched.end());
     if (len_a != len_b) {
