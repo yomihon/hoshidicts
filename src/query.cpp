@@ -21,6 +21,7 @@
 #include <memory>
 #include <ranges>
 #include <string_view>
+#include <utf8.h>
 
 #include "hash/hash.hpp"
 #include "json/yomitan_parser.hpp"
@@ -102,6 +103,13 @@ uint32_t read_u32(const uint8_t*& addr) {
   return result;
 }
 
+int32_t read_i32(const uint8_t*& addr) {
+  int32_t result;
+  std::memcpy(&result, addr, sizeof(int32_t));
+  addr += sizeof(int32_t);
+  return result;
+}
+
 uint64_t read_u64(const uint8_t*& addr) {
   uint64_t result;
   std::memcpy(&result, addr, sizeof(uint64_t));
@@ -123,6 +131,58 @@ int query_match_priority(const TermResult& term, const std::string& expression) 
     return 1;
   }
   return 2;
+}
+
+bool has_storage_marker(const std::string& path) {
+  return std::filesystem::is_regular_file(path + "/.hoshidicts_1") ||
+         std::filesystem::is_regular_file(path + "/.hoshidicts_2");
+}
+
+int detect_storage_version(const std::string& path) {
+  if (std::filesystem::is_regular_file(path + "/.hoshidicts_2")) {
+    return 2;
+  }
+  if (std::filesystem::is_regular_file(path + "/.hoshidicts_1")) {
+    return 1;
+  }
+  return 0;
+}
+
+bool is_kana_codepoint(uint32_t codepoint) {
+  return (codepoint >= 0x3040 && codepoint <= 0x309f) || (codepoint >= 0x30a0 && codepoint <= 0x30ff) ||
+         (codepoint >= 0xff66 && codepoint <= 0xff9f);
+}
+
+bool is_kanji_codepoint(uint32_t codepoint) {
+  return (codepoint >= 0x3400 && codepoint <= 0x4dbf) || (codepoint >= 0x4e00 && codepoint <= 0x9fff) ||
+         (codepoint >= 0xf900 && codepoint <= 0xfaff);
+}
+
+bool is_kana_only(std::string_view text) {
+  if (text.empty()) {
+    return false;
+  }
+
+  auto it = text.begin();
+  while (it != text.end()) {
+    const uint32_t codepoint = utf8::next(it, text.end());
+    if (!is_kana_codepoint(codepoint)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool contains_kanji(std::string_view text) {
+  auto it = text.begin();
+  while (it != text.end()) {
+    if (is_kanji_codepoint(utf8::next(it, text.end()))) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 int get_freq_value_for_dict(const TermResult& term, const std::string& dict_name) {
@@ -269,6 +329,7 @@ bool has_meta_mode_entries_in_storage(const uint8_t* hash_table, size_t hash_tab
 }
 
 struct DictionaryQuery::DictionaryData {
+  int storage_version = 1;
   hash::linear table;
   uint8_t* blobs = nullptr;
   size_t blobs_size = 0;
@@ -302,7 +363,7 @@ bool DictionaryQuery::has_meta_mode_entries(const std::string& path, const std::
     return false;
   }
 
-  if (!std::filesystem::is_regular_file(path + "/.hoshidicts_1")) {
+  if (!has_storage_marker(path)) {
     return false;
   }
 
@@ -324,7 +385,8 @@ bool DictionaryQuery::has_meta_mode_entries(const std::string& path, const std::
 }
 
 void DictionaryQuery::add_dict(const std::string& path, DictionaryType type) {
-  if (!std::filesystem::is_regular_file(path + "/.hoshidicts_1")) {
+  const int storage_version = detect_storage_version(path);
+  if (storage_version == 0) {
     return;
   }
 
@@ -342,6 +404,7 @@ void DictionaryQuery::add_dict(const std::string& path, DictionaryType type) {
   }
 
   dict.data = std::make_unique<DictionaryData>();
+  dict.data->storage_version = storage_version;
 
   auto [hash_table, hash_table_size] = map_file(path + "/hash.table");
   if (!hash_table) {
@@ -416,6 +479,7 @@ std::vector<TermResult> DictionaryQuery::query(const std::string& expression) co
 
       uint16_t reading_len = read_u16(blob_addr);
       std::string_view reading = read_str(blob_addr, reading_len);
+      const int score = data->storage_version >= 2 ? read_i32(blob_addr) : 0;
 
       if (expr != expression && reading != expression) {
         continue;
@@ -445,6 +509,7 @@ std::vector<TermResult> DictionaryQuery::query(const std::string& expression) co
         it->second = {.expression = std::string(expr),
                       .reading = std::string(reading),
                       .rules = std::string(rules),
+                      .score = score,
                       .glossaries = {},
                       .frequencies = {},
                       .pitches = {}};
@@ -474,6 +539,18 @@ std::vector<TermResult> DictionaryQuery::query(const std::string& expression) co
     const int match_b = query_match_priority(b, expression);
     if (match_a != match_b) {
       return match_a < match_b;
+    }
+
+    if (is_kana_only(expression)) {
+      const bool kana_expr_a = is_kana_only(a.expression);
+      const bool kana_expr_b = is_kana_only(b.expression);
+      if (kana_expr_a != kana_expr_b) {
+        return kana_expr_a;
+      }
+    }
+
+    if (contains_kanji(expression) && a.score != b.score) {
+      return a.score > b.score;
     }
 
     if (freq_sort_order(a, b, freq_dict_order)) {

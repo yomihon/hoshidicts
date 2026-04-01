@@ -163,14 +163,14 @@ namespace {
     jobject new_term_result(JNIEnv *env, const TermResult &term) {
         jclass cls = env->FindClass("de/manhhao/hoshi/TermResult");
         jmethodID ctor = env->GetMethodID(cls, "<init>",
-                                          "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Lde/manhhao/hoshi/GlossaryEntry;[Lde/manhhao/hoshi/FrequencyEntry;[Lde/manhhao/hoshi/PitchEntry;)V");
+                                          "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I[Lde/manhhao/hoshi/GlossaryEntry;[Lde/manhhao/hoshi/FrequencyEntry;[Lde/manhhao/hoshi/PitchEntry;)V");
         jstring expression = new_string(env, term.expression);
         jstring reading = new_string(env, term.reading);
         jstring rules = new_string(env, term.rules);
         jobjectArray glossaries = new_glossary_entry_array(env, term.glossaries);
         jobjectArray frequencies = new_frequency_entry_array(env, term.frequencies);
         jobjectArray pitches = new_pitch_entry_array(env, term.pitches);
-        jobject out = env->NewObject(cls, ctor, expression, reading, rules, glossaries, frequencies,
+        jobject out = env->NewObject(cls, ctor, expression, reading, rules, static_cast<jint>(term.score), glossaries, frequencies,
                                      pitches);
         env->DeleteLocalRef(expression);
         env->DeleteLocalRef(reading);

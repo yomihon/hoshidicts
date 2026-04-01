@@ -20,6 +20,42 @@ std::vector<std::string> split_whitespace(const std::string& str) {
   return result;
 }
 
+bool is_kana_codepoint(uint32_t codepoint) {
+  return (codepoint >= 0x3040 && codepoint <= 0x309f) || (codepoint >= 0x30a0 && codepoint <= 0x30ff) ||
+         (codepoint >= 0xff66 && codepoint <= 0xff9f);
+}
+
+bool is_kanji_codepoint(uint32_t codepoint) {
+  return (codepoint >= 0x3400 && codepoint <= 0x4dbf) || (codepoint >= 0x4e00 && codepoint <= 0x9fff) ||
+         (codepoint >= 0xf900 && codepoint <= 0xfaff);
+}
+
+bool is_kana_only(std::string_view text) {
+  if (text.empty()) {
+    return false;
+  }
+
+  auto it = text.begin();
+  while (it != text.end()) {
+    if (!is_kana_codepoint(utf8::next(it, text.end()))) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool contains_kanji(std::string_view text) {
+  auto it = text.begin();
+  while (it != text.end()) {
+    if (is_kanji_codepoint(utf8::next(it, text.end()))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 int get_freq_value_for_dict(const TermResult& term, const std::string& dict_name) {
   for (const auto& frequency_entry : term.frequencies) {
     if (frequency_entry.dict_name != dict_name) {
@@ -48,6 +84,33 @@ bool freq_sort_order(const LookupResult& a, const LookupResult& b, const std::ve
   }
 
   return false;
+}
+
+bool term_sort_order(const LookupResult& a, const LookupResult& b, std::string_view lookup_input,
+                     const std::vector<std::string>& freq_dict_order) {
+  if (is_kana_only(lookup_input)) {
+    const bool kana_expr_a = is_kana_only(a.term.expression);
+    const bool kana_expr_b = is_kana_only(b.term.expression);
+    if (kana_expr_a != kana_expr_b) {
+      return kana_expr_a;
+    }
+  }
+
+  if (contains_kanji(lookup_input) && a.term.score != b.term.score) {
+    return a.term.score > b.term.score;
+  }
+
+  if (freq_sort_order(a, b, freq_dict_order)) {
+    return true;
+  }
+  if (freq_sort_order(b, a, freq_dict_order)) {
+    return false;
+  }
+
+  if (a.term.expression != b.term.expression) {
+    return a.term.expression < b.term.expression;
+  }
+  return a.term.reading < b.term.reading;
 }
 }
 
@@ -133,7 +196,7 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
       return process_len_a < process_len_b;
     }
 
-    return freq_sort_order(a, b, freq_dict_order);
+    return term_sort_order(a, b, lookup_string, freq_dict_order);
   });
 
   if (results.size() > static_cast<size_t>(max_results)) {

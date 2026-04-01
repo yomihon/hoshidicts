@@ -159,6 +159,12 @@ void write_u32(std::vector<char>& out, uint32_t value) {
   std::memcpy(out.data() + old_size, &value, sizeof(uint32_t));
 }
 
+void write_i32(std::vector<char>& out, int32_t value) {
+  const size_t old_size = out.size();
+  out.resize(old_size + sizeof(int32_t));
+  std::memcpy(out.data() + old_size, &value, sizeof(int32_t));
+}
+
 void write_u64(std::vector<char>& out, uint64_t value) {
   const size_t old_size = out.size();
   out.resize(old_size + sizeof(uint64_t));
@@ -255,6 +261,7 @@ ProcessedFile process_term_bank(const std::string& content) {
     write_str(processed.data, expr);
     write_u16(processed.data, reading.size());
     write_str(processed.data, reading);
+    write_i32(processed.data, term.score);
 
     uint64_t glossary_offset = processed.data.size();
     write_u64(processed.data, 0);
@@ -490,6 +497,7 @@ size_t write_media(const std::string& path, zip_t* archive, const std::vector<in
 
 bool has_materialized_output(const std::filesystem::path& path) {
   return std::filesystem::is_regular_file(path / ".hoshidicts_1") ||
+         std::filesystem::is_regular_file(path / ".hoshidicts_2") ||
          (std::filesystem::is_regular_file(path / "index.json") &&
           std::filesystem::is_regular_file(path / "blobs.bin") &&
           std::filesystem::is_regular_file(path / "hash.table"));
@@ -563,7 +571,7 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
 
     result.media_count = media_thread.get();
 
-    std::ofstream sui(path + "/.hoshidicts_1", std::ios::binary);
+    std::ofstream sui(path + "/.hoshidicts_2", std::ios::binary);
     result.success = true;
   } catch (const std::exception& e) {
     result.success = false;

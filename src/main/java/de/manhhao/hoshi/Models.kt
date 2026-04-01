@@ -70,6 +70,7 @@ data class TermResult(
     val expression: String,
     val reading: String,
     val rules: String,
+    val score: Int,
     val glossaries: Array<GlossaryEntry>,
     val frequencies: Array<FrequencyEntry>,
     val pitches: Array<PitchEntry>
@@ -83,6 +84,7 @@ data class TermResult(
         if (expression != other.expression) return false
         if (reading != other.reading) return false
         if (rules != other.rules) return false
+        if (score != other.score) return false
         if (!glossaries.contentEquals(other.glossaries)) return false
         if (!frequencies.contentEquals(other.frequencies)) return false
         if (!pitches.contentEquals(other.pitches)) return false
@@ -94,6 +96,7 @@ data class TermResult(
         var result = expression.hashCode()
         result = 31 * result + reading.hashCode()
         result = 31 * result + rules.hashCode()
+        result = 31 * result + score
         result = 31 * result + glossaries.contentHashCode()
         result = 31 * result + frequencies.contentHashCode()
         result = 31 * result + pitches.contentHashCode()
