@@ -1,5 +1,7 @@
 A fork of hoshidicts, adding a Kotlin API for use with Yomihon. It can be added via jitpack: https://jitpack.io/#yomihon/hoshidicts/
 
+For the API, see the following two files: [Models.kt](src/main/java/de/manhhao/hoshi/Models.kt) and [HoshiDicts.kt](src/main/java/de/manhhao/hoshi/HoshiDicts.kt)
+
 # hoshidicts
 
 This library implements a dictionary backend that works similarly to [Yomitan](https://github.com/yomidevs/yomitan). This was made for [Hoshi Reader](https://github.com/Manhhao/Hoshi-Reader) and was only tested with Japanese. Other languages might need their own deinflector or adjustments to the lookup strategy.
